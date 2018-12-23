@@ -21,7 +21,12 @@ let foobar = 838383;
 		t.Fatalf("ParseProgram() returned nil")
 	}
 
+	if !assert.Len(t, p.Errors(), 0) {
+		return
+	}
+
 	assert.Len(t, program.Statements, 3)
+
 
 	tests := []struct {
 		expectedIdentifier string
@@ -33,13 +38,34 @@ let foobar = 838383;
 
 	for i, test := range tests {
 		stmt := program.Statements[i]
-		if !assert.Len(t, p.Errors(), 0) {
-			continue
-		}
 		assert.Equal(t, "let", stmt.TokenLiteral())
 		letStmt, ok := stmt.(*ast.LetStatement)
 		assert.True(t, ok)
 		assert.Equal(t, test.expectedIdentifier, letStmt.Name.Value)
 		assert.Equal(t, test.expectedIdentifier, letStmt.Name.TokenLiteral())
+	}
+}
+
+func TestReturnStatements(t *testing.T) {
+	input := `
+return 5;
+return 10;
+return 993322;
+`
+
+	l := lexer.New(input)
+	p := New(l)
+
+	program := p.ParseProgram()
+	if !assert.Len(t, p.Errors(), 0) {
+		return
+	}
+
+	assert.Len(t, program.Statements, 3)
+
+	for _, stmt := range program.Statements {
+		assert.Equal(t, "return", stmt.TokenLiteral())
+		_, ok := stmt.(*ast.ReturnStatement)
+		assert.True(t, ok)
 	}
 }
