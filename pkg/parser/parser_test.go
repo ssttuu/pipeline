@@ -69,3 +69,39 @@ return 993322;
 		assert.True(t, ok)
 	}
 }
+
+func TestIdentifierExpression(t *testing.T) {
+	input := "foobar;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	assert.Len(t, program.Statements, 1)
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	assert.True(t, ok)
+
+	identifier, ok := stmt.Expression.(*ast.Identifier)
+	assert.True(t, ok)
+
+	assert.Equal(t, "foobar", identifier.Value)
+	assert.Equal(t, "foobar", identifier.TokenLiteral())
+}
+
+func TestIntegerLiteralExpression(t *testing.T) {
+	input := `5;`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	assert.Len(t, program.Statements, 1)
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	assert.True(t, ok)
+
+	literal, ok := stmt.Expression.(*ast.IntegerLiteral)
+	assert.True(t, ok)
+
+	assert.Equal(t, int64(5), literal.Value)
+	assert.Equal(t, "5", literal.TokenLiteral())
+}

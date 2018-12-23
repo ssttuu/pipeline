@@ -5,6 +5,23 @@ import (
 	"github.com/ssttuu/monkey/pkg/ast"
 	"github.com/ssttuu/monkey/pkg/lexer"
 	"github.com/ssttuu/monkey/pkg/token"
+	"strconv"
+)
+
+const (
+	_ int = iota
+	Lowest
+	Equals
+	LessOrGreater
+	Sum
+	Product
+	Prefix
+	Call
+)
+
+type (
+	prefixParseFn func() ast.Expression
+	infixParseFn func(expression ast.Expression) ast.Expression
 )
 
 type Parser struct {
@@ -13,6 +30,9 @@ type Parser struct {
 	curToken token.Token
 	peekToken token.Token
 
+	prefixParseFns map[token.TokenType]prefixParseFn
+	infixParseFns map[token.TokenType]infixParseFn
+
 	errors []string
 }
 
@@ -20,7 +40,11 @@ func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		l: l,
 		errors: []string{},
+		prefixParseFns: make(map[token.TokenType]prefixParseFn),
 	}
+
+	p.registerPrefix(token.Identifier, p.parseIdentifier)
+	p.registerPrefix(token.Integer, p.parseIntegerLiteral)
 
 	// read two tokens, so curToken and peekToken are both set
 	p.nextToken()
@@ -38,6 +62,14 @@ func (p *Parser) nextToken() {
 	p.peekToken = p.l.NextToken()
 }
 
+func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
+	p.infixParseFns[tokenType] = fn
+}
+
+func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
+	p.prefixParseFns[tokenType] = fn
+}
+
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
@@ -52,6 +84,23 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
+func (p *Parser) parseIdentifier() ast.Expression {
+	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseIntegerLiteral() ast.Expression {
+	lit := &ast.IntegerLiteral{Token: p.curToken}
+	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+
+	lit.Value = value
+	return lit
+}
+
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.Let:
@@ -59,8 +108,29 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.Return:
 		return p.parseReturnStatement()
 	default:
+		return p.parseExpressionStatement()
+	}
+}
+
+func (p *Parser) parseExpression(precendence int) ast.Expression {
+	prefix := p.prefixParseFns[p.curToken.Type]
+	if prefix == nil {
 		return nil
 	}
+
+	leftExp := prefix()
+	return leftExp
+}
+
+func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
+	stmt := &ast.ExpressionStatement{Token:p.curToken}
+	stmt.Expression = p.parseExpression(Lowest)
+
+	if p.peekTokenIs(token.Semicolon) {
+		p.nextToken()
+	}
+
+	return stmt
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
