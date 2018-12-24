@@ -3,16 +3,16 @@ package lexer
 import "github.com/ssttuu/monkey/pkg/token"
 
 func New(input string) *Lexer {
-	l := &Lexer{input:input}
+	l := &Lexer{input: input}
 	l.readChar()
 	return l
 }
 
 type Lexer struct {
-	input string
-	position int
+	input        string
+	position     int
 	readPosition int
-	ch byte
+	ch           byte
 }
 
 func (l *Lexer) readChar() {
@@ -180,5 +180,5 @@ func isLetter(ch byte) bool {
 }
 
 func newToken(t token.TokenType, ch byte) token.Token {
-	return token.Token{Type: t, Literal:string(ch)}
+	return token.Token{Type: t, Literal: string(ch)}
 }

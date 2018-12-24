@@ -15,16 +15,16 @@ const (
 	Integer    = "Integer"
 
 	// Operators
-	Assign     = "="
-	Plus       = "+"
-	PlusEqual  = "+="
-	Minus      = "-"
-	MinusEqual = "-="
-	Not        = "!"
-	Multiply   = "*"
+	Assign        = "="
+	Plus          = "+"
+	PlusEqual     = "+="
+	Minus         = "-"
+	MinusEqual    = "-="
+	Not           = "!"
+	Multiply      = "*"
 	MultiplyEqual = "*="
-	Divide     = "/"
-	DivideEqual = "/="
+	Divide        = "/"
+	DivideEqual   = "/="
 
 	// Comparison
 	Equal              = "=="

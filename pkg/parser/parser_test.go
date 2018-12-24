@@ -27,7 +27,6 @@ let foobar = 838383;
 
 	assert.Len(t, program.Statements, 3)
 
-
 	tests := []struct {
 		expectedIdentifier string
 	}{
@@ -106,11 +105,49 @@ func TestIntegerLiteralExpression(t *testing.T) {
 	assert.Equal(t, "5", literal.TokenLiteral())
 }
 
+func TestParsingInfixExpressions(t *testing.T) {
+	infixTests := []struct {
+		input      string
+		leftValue  int64
+		operator   string
+		rightValue int64
+	}{
+		{"5 + 5;", 5, "+", 5},
+		{"5 - 5;", 5, "-", 5},
+		{"5 * 5;", 5, "*", 5},
+		{"5 / 5;", 5, "/", 5},
+		{"5 > 5;", 5, ">", 5},
+		{"5 >= 5;", 5, ">=", 5},
+		{"5 < 5;", 5, "<", 5},
+		{"5 <= 5;", 5, "<=", 5},
+		{"5 == 5;", 5, "==", 5},
+		{"5 != 5;", 5, "!=", 5},
+	}
+
+	for _, test := range infixTests {
+		l := lexer.New(test.input)
+		p := New(l)
+		program := p.ParseProgram()
+
+		assert.Len(t, program.Statements, 1)
+
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		assert.True(t, ok)
+
+		exp, ok := stmt.Expression.(*ast.InfixExpression)
+		assert.True(t, ok)
+		assert.Equal(t, test.leftValue, exp.Left.(*ast.IntegerLiteral).Value)
+		assert.Equal(t, test.operator, exp.Operator)
+		assert.Equal(t, test.rightValue, exp.Right.(*ast.IntegerLiteral).Value)
+
+	}
+}
+
 func TestParsingPrefixExpressions(t *testing.T) {
 	prefixTests := []struct {
-		input string
+		input    string
 		operator string
-		value int64
+		value    int64
 	}{
 		{"!5;", "!", 5},
 		{"-5;", "-", 5},
@@ -129,5 +166,74 @@ func TestParsingPrefixExpressions(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, test.operator, exp.Operator)
 
+	}
+}
+
+func TestOperatorPrecedenceParsing(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			"-a * b",
+			"((-a) * b)",
+		},
+		{
+			"!-a",
+			"(!(-a))",
+		},
+		{
+			"a + b + c",
+			"((a + b) + c)",
+		},
+		{
+			"a + b - c",
+			"((a + b) - c)",
+		},
+		{
+			"a * b * c",
+			"((a * b) * c)",
+		},
+		{
+			"a * b / c",
+			"((a * b) / c)",
+		},
+		{
+			"a + b / c",
+			"(a + (b / c))",
+		},
+		{
+			"a + b * c + d / e - f",
+			"(((a + (b * c)) + (d / e)) - f)",
+		},
+		{
+			"3 + 4; -5 * 5",
+			"(3 + 4)((-5) * 5)",
+		},
+		{
+			"5 > 4 == 3 < 4",
+			"((5 > 4) == (3 < 4))",
+		},
+		{
+			"5 < 4 != 3 > 4",
+			"((5 < 4) != (3 > 4))",
+		},
+		{
+			"3 + 4 * 5 == 3 * 1 + 4 * 5",
+			"((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+		},
+		{
+			"5 >= 3 == 3 <= 5",
+			"((5 >= 3) == (3 <= 5))",
+		},
+	}
+
+	for _, test := range tests {
+		l := lexer.New(test.input)
+		p := New(l)
+		program := p.ParseProgram()
+		assert.Len(t, p.Errors(), 0)
+
+		assert.Equal(t, test.expected, program.String())
 	}
 }

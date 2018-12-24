@@ -16,7 +16,7 @@ func TestString(t *testing.T) {
 					Value: "myVar",
 				},
 				Value: &Identifier{
-					Token: token.Token{Type:token.Identifier, Literal: "anotherVar"},
+					Token: token.Token{Type: token.Identifier, Literal: "anotherVar"},
 					Value: "anotherVar",
 				},
 			},

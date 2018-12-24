@@ -31,8 +31,8 @@ if (5 < 100) {
 
 `
 
-	tests := []struct{
-		expectedType token.TokenType
+	tests := []struct {
+		expectedType    token.TokenType
 		expectedLiteral string
 	}{
 		{token.Let, "let"},
@@ -87,7 +87,7 @@ if (5 < 100) {
 		{token.Integer, "10"},
 		{token.GreaterThan, ">"},
 		{token.Integer, "5"},
-		{token.Semicolon,";"},
+		{token.Semicolon, ";"},
 
 		{token.If, "if"},
 		{token.LeftParentheses, "("},
