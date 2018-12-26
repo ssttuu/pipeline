@@ -1,11 +1,27 @@
 package parser
 
 import (
+	"fmt"
 	"github.com/ssttuu/monkey/pkg/ast"
 	"github.com/ssttuu/monkey/pkg/lexer"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
+func testLiteralExpression(t *testing.T, exp ast.Expression, expected interface{}) {
+	switch v := expected.(type) {
+	case bool:
+		testBooleanLiteral(t, exp, v)
+	}
+}
+
+func testBooleanLiteral(t *testing.T, exp ast.Expression, value bool) {
+	bo, ok := exp.(*ast.Boolean)
+	assert.True(t, ok)
+
+	assert.Equal(t, value, bo.Value)
+	assert.Equal(t, fmt.Sprintf("%t", value), bo.TokenLiteral())
+}
 
 func TestLetStatements(t *testing.T) {
 	input := `
@@ -69,6 +85,33 @@ return 993322;
 	}
 }
 
+func TestBooleanExpression(t *testing.T) {
+
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{`true;`, true},
+		{`false;`, false},
+	}
+
+	for _, test := range tests {
+		l := lexer.New(test.input)
+		p := New(l)
+		program := p.ParseProgram()
+
+		assert.Len(t, program.Statements, 1)
+
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		assert.True(t, ok)
+
+		exp, ok := stmt.Expression.(*ast.Boolean)
+		assert.True(t, ok)
+		assert.Equal(t, test.expected, exp.Value)
+	}
+
+}
+
 func TestIdentifierExpression(t *testing.T) {
 	input := "foobar;"
 	l := lexer.New(input)
@@ -108,10 +151,13 @@ func TestIntegerLiteralExpression(t *testing.T) {
 func TestParsingInfixExpressions(t *testing.T) {
 	infixTests := []struct {
 		input      string
-		leftValue  int64
+		leftValue  interface{}
 		operator   string
-		rightValue int64
+		rightValue interface{}
 	}{
+		{"true == true;", true, "==", true},
+		{"true != false;", true, "!=", false},
+		{"false == false;", false, "==", false},
 		{"5 + 5;", 5, "+", 5},
 		{"5 - 5;", 5, "-", 5},
 		{"5 * 5;", 5, "*", 5},
@@ -130,16 +176,28 @@ func TestParsingInfixExpressions(t *testing.T) {
 		program := p.ParseProgram()
 
 		assert.Len(t, program.Statements, 1)
-
 		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 		assert.True(t, ok)
 
-		exp, ok := stmt.Expression.(*ast.InfixExpression)
-		assert.True(t, ok)
-		assert.Equal(t, test.leftValue, exp.Left.(*ast.IntegerLiteral).Value)
-		assert.Equal(t, test.operator, exp.Operator)
-		assert.Equal(t, test.rightValue, exp.Right.(*ast.IntegerLiteral).Value)
+		testInfixExpression(t, stmt.Expression, test.leftValue, test.operator, test.rightValue)
+	}
+}
 
+func testInfixExpression(t *testing.T, exp ast.Expression, left interface{}, operator string, right interface{}) {
+	infix, ok := exp.(*ast.InfixExpression)
+	assert.True(t, ok)
+
+	testNode(t, left, infix.Left)
+	assert.Equal(t, operator, infix.Operator)
+	testNode(t, right, infix.Right)
+}
+
+func testNode(t *testing.T, value interface{}, expected interface{}) {
+	switch v := value.(type) {
+	case int:
+		assert.Equal(t, int64(v), expected.(*ast.IntegerLiteral).Value)
+	case bool:
+		assert.Equal(t, v, expected.(*ast.Boolean).Value)
 	}
 }
 
@@ -147,8 +205,10 @@ func TestParsingPrefixExpressions(t *testing.T) {
 	prefixTests := []struct {
 		input    string
 		operator string
-		value    int64
+		value    interface{}
 	}{
+		{"!true;", "!", true},
+		{"!false;", "!", false},
 		{"!5;", "!", 5},
 		{"-5;", "-", 5},
 	}
@@ -174,6 +234,22 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		input    string
 		expected string
 	}{
+		{
+			"true",
+			"true",
+		},
+		{
+			"false",
+			"false",
+		},
+		{
+			"3 > 5 == false",
+			"((3 > 5) == false)",
+		},
+		{
+			"3 < 5 == true",
+			"((3 < 5) == true)",
+		},
 		{
 			"-a * b",
 			"((-a) * b)",
@@ -226,6 +302,26 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"5 >= 3 == 3 <= 5",
 			"((5 >= 3) == (3 <= 5))",
 		},
+		{
+			"1 + (2 + 3) + 4",
+			"((1 + (2 + 3)) + 4)",
+		},
+		{
+			"(5 + 5) * 2",
+			"((5 + 5) * 2)",
+		},
+		{
+			"2 / (5 + 5)",
+			"(2 / (5 + 5))",
+		},
+		{
+			"-(5 + 5)",
+			"(-(5 + 5))",
+		},
+		{
+			"!(true == true)",
+			"(!(true == true))",
+		},
 	}
 
 	for _, test := range tests {
@@ -236,4 +332,32 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 
 		assert.Equal(t, test.expected, program.String())
 	}
+}
+
+func TestIfExpression(t *testing.T) {
+	input := `if (x < y) { x }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	assert.Len(t, p.errors, 0)
+	assert.Len(t, program.Statements, 1)
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	assert.True(t, ok)
+
+	exp, ok := stmt.Expression.(*ast.IfExpression)
+	assert.True(t, ok)
+	assert.Len(t, exp.Consequence.Statements, 1)
+
+	consequence, ok := exp.Consequence.Statements[0].(*ast.ExpressionStatement)
+	assert.True(t, ok)
+
+	assert.Equal(t, "x", consequence.Expression.TokenLiteral())
+	assert.Nil(t, exp.Alternative)
+}
+
+func testIdentifier(t *testing.T, exp ast.Expression, v string) {
+
+
 }
