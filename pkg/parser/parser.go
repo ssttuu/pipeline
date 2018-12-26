@@ -30,10 +30,11 @@ var precedences = map[token.TokenType]int{
 	token.Minus:              Sum,
 	token.Divide:             Product,
 	token.Multiply:           Product,
+	token.LeftParentheses:    Call,
 }
 
 type (
-	infixParseFn  func(expression ast.Expression) ast.Expression
+	infixParseFn func(expression ast.Expression) ast.Expression
 	prefixParseFn func() ast.Expression
 )
 
@@ -73,6 +74,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.GreaterThan, p.parseInfixExpression)
 	p.registerInfix(token.GreaterThanOrEqual, p.parseInfixExpression)
 
+	p.registerInfix(token.LeftParentheses, p.parseCallExpression)
+
 	// Prefix
 	p.registerPrefix(token.Identifier, p.parseIdentifier)
 	p.registerPrefix(token.Integer, p.parseIntegerLiteral)
@@ -85,6 +88,7 @@ func New(l *lexer.Lexer) *Parser {
 
 	p.registerPrefix(token.LeftParentheses, p.parseGroupedExpression)
 	p.registerPrefix(token.If, p.parseIfExpression)
+	p.registerPrefix(token.Function, p.parseFunctionLiteral)
 
 	// read two tokens, so curToken and peekToken are both set
 	p.nextToken()
@@ -122,6 +126,68 @@ func (p *Parser) ParseProgram() *ast.Program {
 		p.nextToken()
 	}
 	return program
+}
+
+func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
+	exp := &ast.CallExpression{Token: p.curToken, Function: function}
+	exp.Arguments = p.parseCallArguments()
+	return exp
+}
+
+func (p *Parser) parseCallArguments() []ast.Expression {
+	var args []ast.Expression
+	if p.peekTokenIs(token.RightParentheses) {
+		p.nextToken()
+		return args
+	}
+	p.nextToken()
+
+	args = append(args, p.parseExpression(Lowest))
+	for p.peekTokenIs(token.Comma) {
+		p.nextToken()
+		p.nextToken()
+		args = append(args, p.parseExpression(Lowest))
+	}
+
+	if !p.expectPeek(token.RightParentheses) {
+		return nil
+	}
+
+	return args
+}
+
+func (p *Parser) parseFunctionLiteral() ast.Expression {
+	lit := &ast.FunctionLiteral{Token: p.curToken}
+	if !p.expectPeek(token.LeftParentheses) {
+		return nil
+	}
+	lit.Parameters = p.parseFunctionParameters()
+	if !p.expectPeek(token.LeftBrace) {
+		return nil
+	}
+	lit.Body = p.parseBlockStatement()
+	return lit
+}
+
+func (p *Parser) parseFunctionParameters() []*ast.Identifier {
+	var identifiers []*ast.Identifier
+	if p.peekTokenIs(token.RightParentheses) {
+		p.nextToken()
+		return identifiers
+	}
+	p.nextToken()
+	ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, ident)
+	for p.peekTokenIs(token.Comma) {
+		p.nextToken()
+		p.nextToken()
+		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		identifiers = append(identifiers, ident)
+	}
+	if !p.expectPeek(token.RightParentheses) {
+		return nil
+	}
+	return identifiers
 }
 
 func (p *Parser) parseGroupedExpression() ast.Expression {
