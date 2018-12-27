@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	Null = &object.Null{}
-	True = &object.Boolean{Value: true}
+	Null  = &object.Null{}
+	True  = &object.Boolean{Value: true}
 	False = &object.Boolean{Value: false}
 )
 
@@ -21,11 +21,12 @@ func Eval(node ast.Node) object.Object {
 	case *ast.PrefixExpression:
 		right := Eval(node.Right)
 		return evalPrefixExpression(node.Operator, right)
+	case *ast.InfixExpression:
+		left := Eval(node.Left)
+		right := Eval(node.Right)
+		return evalInfixExpression(node.Operator, left, right)
 	case *ast.Boolean:
-		if node.Value {
-			return True
-		}
-		return False
+		return nativeBoolToBooleanObject(node.Value)
 	case *ast.IntegerLiteral:
 		return &object.Integer{Value: node.Value}
 	}
@@ -51,6 +52,49 @@ func evalPrefixExpression(operator string, right object.Object) object.Object {
 	}
 }
 
+func evalInfixExpression(operator string, left, right object.Object) object.Object {
+	switch {
+	case left.Type() == object.IntegerType && right.Type() == object.IntegerType:
+		return evalIntegerInfixExpression(operator, left, right)
+	case operator == token.Equal:
+		return nativeBoolToBooleanObject(left == right)
+	case operator == token.NotEqual:
+		return nativeBoolToBooleanObject(left != right)
+	default:
+		return Null
+	}
+}
+
+func evalIntegerInfixExpression(operator string, left, right object.Object) object.Object {
+	leftVal := left.(*object.Integer).Value
+	rightVal := right.(*object.Integer).Value
+
+	switch operator {
+	case token.Plus:
+		return &object.Integer{Value: leftVal + rightVal}
+	case token.Minus:
+		return &object.Integer{Value: leftVal - rightVal}
+	case token.Multiply:
+		return &object.Integer{Value: leftVal * rightVal}
+	case token.Divide:
+		return &object.Integer{Value: leftVal / rightVal}
+	case token.LessThan:
+		return nativeBoolToBooleanObject(leftVal < rightVal)
+	case token.LessThanOrEqual:
+		return nativeBoolToBooleanObject(leftVal <= rightVal)
+	case token.GreaterThan:
+		return nativeBoolToBooleanObject(leftVal > rightVal)
+	case token.GreaterThanOrEqual:
+		return nativeBoolToBooleanObject(leftVal >= rightVal)
+	case token.Equal:
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case token.NotEqual:
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	default:
+		return Null
+	}
+}
+
 func evalNotOperatorExpression(right object.Object) object.Object {
 	switch right {
 	case True:
@@ -71,4 +115,11 @@ func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
 
 	value := right.(*object.Integer).Value
 	return &object.Integer{Value: -value}
+}
+
+func nativeBoolToBooleanObject(b bool) *object.Boolean {
+	if b {
+		return True
+	}
+	return False
 }
