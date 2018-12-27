@@ -8,14 +8,23 @@ import (
 	"testing"
 )
 
-func testLiteralExpression(t *testing.T, exp ast.Expression, expected interface{}) {
+func assertLiteralExpression(t *testing.T, exp ast.Expression, expected interface{}) {
 	switch v := expected.(type) {
+	case int:
+		assertIntegerLiteral(t, exp, int64(v))
 	case bool:
-		testBooleanLiteral(t, exp, v)
+		assertBooleanLiteral(t, exp, v)
 	}
 }
 
-func testBooleanLiteral(t *testing.T, exp ast.Expression, value bool) {
+func assertIntegerLiteral(t *testing.T, exp ast.Expression, value int64) {
+	i, ok := exp.(*ast.IntegerLiteral)
+	assert.True(t, ok)
+
+	assert.Equal(t, value, i.Value)
+}
+
+func assertBooleanLiteral(t *testing.T, exp ast.Expression, value bool) {
 	bo, ok := exp.(*ast.Boolean)
 	assert.True(t, ok)
 
@@ -24,40 +33,30 @@ func testBooleanLiteral(t *testing.T, exp ast.Expression, value bool) {
 }
 
 func TestLetStatements(t *testing.T) {
-	input := `
-let x = 5;
-let y = 10;
-let foobar = 838383;
-`
-
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
-	if program == nil {
-		t.Fatalf("ParseProgram() returned nil")
-	}
-
-	if !assert.Len(t, p.Errors(), 0) {
-		return
-	}
-
-	assert.Len(t, program.Statements, 3)
 
 	tests := []struct {
+		input string
 		expectedIdentifier string
+		expectedValue interface{}
 	}{
-		{"x"},
-		{"y"},
-		{"foobar"},
+		{"let x = 5;", "x", 5},
+		{"let y = true;", "y", true},
+		{"let foobar = y;", "foobar", "y"},
 	}
 
-	for i, test := range tests {
-		stmt := program.Statements[i]
-		assert.Equal(t, "let", stmt.TokenLiteral())
-		letStmt, ok := stmt.(*ast.LetStatement)
-		assert.True(t, ok)
-		assert.Equal(t, test.expectedIdentifier, letStmt.Name.Value)
-		assert.Equal(t, test.expectedIdentifier, letStmt.Name.TokenLiteral())
+	for _, test := range tests {
+		l := lexer.New(test.input)
+		p := New(l)
+		program := p.ParseProgram()
+
+		assert.Len(t, p.errors, 0)
+		assert.Len(t, program.Statements, 1)
+
+		stmt := program.Statements[0]
+
+		let := stmt.(*ast.LetStatement)
+		assert.Equal(t, test.expectedIdentifier, let.Name.Value)
+		assertLiteralExpression(t, let.Value, test.expectedValue)
 	}
 }
 
