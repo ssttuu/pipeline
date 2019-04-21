@@ -1,0 +1,19 @@
+pipeline pr {
+  shell validate {
+    display = "Validate"
+    script = "ls"
+  }
+
+  shell lint {
+    env {
+      name = "bob"
+    }
+    display = "Lint after ${validate.name}"
+    script = "ls"
+  }
+
+  shell build {
+    display = "Build: ${githash} after ${lint.display}"
+    script = "echo 'hello world'"
+  }
+}
