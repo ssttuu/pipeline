@@ -16,4 +16,24 @@ pipeline pr {
     display = "Build: ${githash} after ${lint.display}"
     script = "echo 'hello world'"
   }
+
+  docker-run test {
+    display = build.stdout
+    image = "golang:1.12"
+    command = "go version"
+  }
+
+  stage deploy {
+    stage dev {
+      display = "Dev"
+    }
+
+    stage staging {
+      display = "Staging"
+    }
+
+    stage prod {
+      display = "Prod"
+    }
+  }
 }

@@ -27,19 +27,21 @@ func init() {
 	})
 	Plugins["shell"] = &Shell{}
 
-	//Schema.Blocks = append(Schema.Blocks, hcl.BlockHeaderSchema{
-	//	Type: "stage",
-	//	LabelNames: []string{
-	//		"name",
-	//	},
-	//})
-	//
-	//Schema.Blocks = append(Schema.Blocks, hcl.BlockHeaderSchema{
-	//	Type: "docker",
-	//	LabelNames: []string{
-	//		"name",
-	//	},
-	//})
+	Schema.Blocks = append(Schema.Blocks, hcl.BlockHeaderSchema{
+		Type: "stage",
+		LabelNames: []string{
+			"name",
+		},
+	})
+	Plugins["stage"] = &Stage{}
+
+	Schema.Blocks = append(Schema.Blocks, hcl.BlockHeaderSchema{
+		Type: "docker-run",
+		LabelNames: []string{
+			"name",
+		},
+	})
+	Plugins["docker-run"] = &DockerRun{}
 }
 
 type Pipeline struct {
@@ -69,13 +71,14 @@ func (p *Pipeline) Execute(ctx *hcl.EvalContext, body hcl.Body) (map[string]cty.
 	}
 
 	for _, block := range content.Blocks {
-		fmt.Println(block.Type)
+		name := block.Labels[0]
+		fmt.Println(block.Type, name)
 		stepCtx := NewChild(ctx)
 		output, err := Plugins[block.Type].Execute(stepCtx, block.Body)
 		if err != nil {
 			return nil, errors.Wrapf(err, "executing plugin: %v", block.Type)
 		}
-		ctx.Variables[block.Labels[0]] = cty.ObjectVal(output)
+		ctx.Variables[name] = cty.ObjectVal(output)
 	}
 
 	return ctx.Variables, nil
